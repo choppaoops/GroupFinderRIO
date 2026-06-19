@@ -138,6 +138,21 @@ GFIO.RAIDS = {
 		difficulty = 3, -- mythic
 		shortName = "DR (M)"
 	},
+	[1947] = {
+		id = 8062, -- Sporefall
+		difficulty = 3, -- mythic
+		shortName = "SF (M)"
+	},
+	[1948] = {
+		id = 8062, -- Sporefall
+		difficulty = 2, -- heroic
+		shortName = "SF (HC)"
+	},
+	[1946] = {
+		id = 8062, -- Sporefall
+		difficulty = 1, -- normal
+		shortName = "SF (NHC)"
+	},
 
 }
 
@@ -645,6 +660,9 @@ GFIO.DUNGEONS = {
 }
 
 GFIO.ACTIVITY_ORDER = {
+	[1947] = 12090, -- Sporefall mythic
+	[1948] = 12080, -- Sporefall heroic
+	[1946] = 12070, -- Sporefall normal
 	[1777] = 12060, -- March of Queldanas mythic
 	[1776] = 12050, -- March of Queldanas heroic
 	[1775] = 12040, -- March of Queldanas normal
