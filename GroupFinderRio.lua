@@ -92,12 +92,31 @@ local function getProgressForRioProfile(profile, instanceID, activeDifficulty)
     return bosscount , charData, maindata 
 end
 
+---comment helper to get the log percentage for a player from archon
+---@param name string
+---@param realm string?
+---@return number? percentage
+local function getLogPercentage(name, realm)
+    if not name then return nil end
+    local profile = ArchonTooltip.GetProfile(name,realm) 
+    if profile and profile.sections then
+        for _,section in pairs(profile.sections) do 
+            if section.anySpecRankings then
+                if section.anySpecRankings.bestAverage then
+                    return section.anySpecRankings.bestAverage or nil
+                end
+            end
+        end
+    end
+    return nil
+end
 
 ---comment helper to get the score for the Leader of a searchResult
 ---@param searchResult LfgSearchResultData
 ---@return number? Mainscore
 ---@return number currentScore
 ---@return string shortLanguage
+---@return number? logPercentage
 local function getScoreForLeader(searchResult)
     local leaderName = searchResult.leaderName
     if not leaderName and searchResult.leaderOverallDungeonScore and not searchResult.isDelisted then 
@@ -108,24 +127,28 @@ local function getScoreForLeader(searchResult)
     local leaderFullName = leaderName:find("-")~=nil and leaderName or leaderName.."-"..GetNormalizedRealmName()
     local faction = searchResult.leaderFactionGroup
     local shortLanguage  = ""
+    local realm = nil
     if leaderFullName then
-        local realm = leaderFullName:match("-(.+)") or GetNormalizedRealmName()
+        realm = leaderFullName:match("-(.+)") or GetNormalizedRealmName()
         assert(realm, "No realm found for player: "..leaderFullName)
         local language = realm and GFIO.REALMS[realm]
         assert(language, "No language found for realm: "..realm)
         shortLanguage = GFIO.LANGUAGES[language] or ""
     end
-
+    local mainScore, charScore = nil, searchResult.leaderOverallDungeonScore
     if RaiderIO and RaiderIO.GetProfile(leaderFullName,faction) then
         local profile = RaiderIO.GetProfile(leaderFullName,faction)
         local mainScore, score = getScoreForRioProfile(profile,nil)
-        if (score or 0) < (searchResult.leaderOverallDungeonScore or 0) then
-            return mainScore, searchResult.leaderOverallDungeonScore, shortLanguage
+        if (score or 0) > (searchResult.leaderOverallDungeonScore or 0) then
+            charScore = score
         end
-        return  mainScore or 0, score or 0, shortLanguage
-    else
-        return nil, searchResult.leaderOverallDungeonScore or 0, shortLanguage
     end
+    local percentage = nil
+    if ArchonTooltip and ArchonTooltip.GetProfile then
+        local nameNoRealm = leaderName:find("-") and leaderName:match("(.+)-") or leaderName
+        percentage = getLogPercentage(nameNoRealm, realm)
+    end
+    return mainScore, charScore or 0, shortLanguage, percentage
 end
 
 ---comment helper to get the RaidProgress for the Leader of a searchResult
@@ -135,6 +158,7 @@ end
 ---@return bossData? mainData
 ---@return string? shortLanguage
 ---@return number? difficulty
+---@return number? logPercentage
 local function getProgressForLeader(searchResult)
     local leaderName = searchResult.leaderName
     local raidZone
@@ -147,22 +171,26 @@ local function getProgressForLeader(searchResult)
         return nil, nil, nil, nil, nil
     end
     local leaderFullName = leaderName:find("-")~=nil and leaderName or leaderName.."-"..GetNormalizedRealmName()
+    local realm = nil
     local faction = searchResult.leaderFactionGroup
     local shortLanguage  = ""
     if leaderFullName then
-        local realm = leaderFullName:match("-(.+)") or GetNormalizedRealmName()
+        realm = leaderFullName:match("-(.+)") or GetNormalizedRealmName()
         assert(realm, "No realm found for player: "..leaderFullName)    
         local language = realm and GFIO.REALMS[realm]
         assert(language, "No language found for realm: "..realm)
         shortLanguage = GFIO.LANGUAGES[language] or ""
     end
+    local maxBosses, charData, mainData, percentage = nil, nil, nil, nil
     if RaiderIO and RaiderIO.GetProfile(leaderFullName,faction) then
         local profile = RaiderIO.GetProfile(leaderFullName,faction)
-        local maxBosses,charData, mainData = getProgressForRioProfile(profile,raidZone.id, raidZone.difficulty)
-        return maxBosses, charData, mainData, shortLanguage, raidZone.difficulty
-    else
-        return nil, nil, nil, shortLanguage, raidZone.difficulty
+        maxBosses,charData, mainData = getProgressForRioProfile(profile,raidZone.id, raidZone.difficulty)
     end
+    if ArchonTooltip and ArchonTooltip.GetProfile then
+        local nameNoRealm = leaderName:find("-") and leaderName:match("(.+)-") or leaderName
+        percentage = getLogPercentage(nameNoRealm, realm)
+    end
+    return maxBosses, charData, mainData, shortLanguage, raidZone.difficulty, percentage
 end
 
 ---comment helper to get the color for a score either using RaiderIO coloring or the ingame coloring of wow
@@ -226,18 +254,56 @@ local function colorScore(score)
     local colorHexString = color:GenerateHexColor()
     local coloredScore = WrapTextInColorCode(score, colorHexString)
     return coloredScore
+end
 
+---comment helper to get the color for a progress by using the ingame rarity coloring of wow. Normal = copper, Heroic = rare, Mythic = epic
+---@param percentage number
+---@return number r
+---@return number g
+---@return number b
+---@return number a
+local function getArchonPercentageolor(percentage)
+    if percentage == 100 then
+        return 229/255, 204/255, 128/255, 1      
+    elseif percentage == 99 then
+        return 24/255, 140/255, 186/255,1
+    elseif percentage >= 95 then
+        return 1,128/255,0, 1
+    elseif percentage >= 75 then
+        return 163/255, 53/255, 238/255, 1
+    elseif percentage >= 50 then
+        return 0, 112/255, 221/255,1
+    elseif percentage >= 25 then
+        return 30/255, 1, 0, 1
+    else
+        return 157/255, 157/255, 157/255,1
+    end
+end
+
+---comment helper to wrap a string in the archon score color
+---@param percentage number
+---@return string
+local function colorArchonScore(percentage)
+    local r,g,b,a = getArchonPercentageolor(percentage)
+    local color = CreateColor(r,g,b,a)
+    local colorHexString = color:GenerateHexColor()
+    local percentageString = percentage.."%"
+    local coloredScore = WrapTextInColorCode(percentageString, colorHexString)
+    return coloredScore
 end
 ---comment helper to adjust group titles for mplus
 ---@param searchResult LfgSearchResultData
 ---@param entry table
 ---@return string
 local function updateMplusData(searchResult,entry)
-    local mainScore,score, shortLanguage = getScoreForLeader(searchResult)
+    local mainScore,score, shortLanguage, logPercentage = getScoreForLeader(searchResult)
     local orginalText = entry.Name:GetText()
     local additionalInfo = ""
     local languageTag = ""
     local highestKey = ""
+    if logPercentage then
+        additionalInfo = "("..colorArchonScore(logPercentage).. ") "
+    end
     if GFIO.db.profile.showKeyLevelLeader and searchResult.leaderDungeonScoreInfo and searchResult.leaderDungeonScoreInfo[1] and
         searchResult.leaderDungeonScoreInfo[1].bestRunLevel and searchResult.leaderDungeonScoreInfo[1].bestRunLevel >0 then
         local scoreInfo = searchResult.leaderDungeonScoreInfo
@@ -328,9 +394,12 @@ end
 ---@param activityInfoTable GroupFinderActivityInfo
 ---@param entry table
 local function updateRaidData(searchResult,activityInfoTable,entry)
-    local maxBosses, charData, mainData, shortLanguage, difficulty = getProgressForLeader(searchResult)
+    local maxBosses, charData, mainData, shortLanguage, difficulty, logPercentage = getProgressForLeader(searchResult)
     local orginalText = entry.Name:GetText()
     local additionalInfo = ""
+    if logPercentage then
+        additionalInfo = "("..colorArchonScore(logPercentage).. ") "
+    end
     if GFIO.db.profile.showInfoInActivityName and GFIO.db.profile.showLanguage and shortLanguage and shortLanguage~="" then
         local colorCodedText = WrapTextInColorCode(shortLanguage, GFIO.Color.BlizzardGameColor) -- use game default font color
         additionalInfo = colorCodedText.. " "
@@ -391,6 +460,8 @@ local function updateLfgListEntry(entry, ...)
             groupName = updateMplusData(searchResult,entry)
         elseif activityInfoTable.categoryID == GROUP_FINDER_CATEGORY_ID_RAIDS then
             groupName = updateRaidData(searchResult,activityInfoTable, entry)
+        else
+            
         end
 
         if GFIO.db.profile.debugMode then
@@ -540,8 +611,8 @@ local function compareSearchEntriesRaid(a,b)
             end
         end
     end
-    local _, charDataA, mainDataA, _, difficultyA = getProgressForLeader(searchResultA)
-    local _, charDataB, mainDataB, _, difficultyB = getProgressForLeader(searchResultB)
+    local _, charDataA, mainDataA, _, difficultyA, logPercentageA = getProgressForLeader(searchResultA)
+    local _, charDataB, mainDataB, _, difficultyB, logPercentageB = getProgressForLeader(searchResultB)
     
     if not charDataA and not charDataB then
         return a>b  -- avoid race condition by randomly sorting the searchResultId not like it matters what we do here
@@ -580,8 +651,12 @@ local function compareSearchEntriesRaid(a,b)
     elseif GFIO.db.profile.addHighestDifficulty and charDataA.highestDifficultyKilledBosses ~= charDataB.highestDifficultyKilledBosses then
         return GFIO.sortFunc(charDataA.highestDifficultyKilledBosses,charDataB.highestDifficultyKilledBosses)
     end
-
-    return GFIO.sortFunc(charDataA.bosskills,charDataB.bosskills)
+    if charDataA.bosskills ~= charDataB.bosskills then
+        return GFIO.sortFunc(charDataA.bosskills,charDataB.bosskills)
+    elseif logPercentageA ~= logPercentageB then
+        return GFIO.sortFunc(logPercentageA or 0, logPercentageB or 0)
+    end
+    return GFIO.sortFunc(a,b)
 
 end
 ---comment hooked to the sortSearchResults function to calls compareSearchEntries to sort the search results
@@ -657,29 +732,37 @@ end
 ---@return boolean damage
 ---@return boolean isMainRole
 ---@return number raceID
----@return table timedKeystonesList
+---@return table? timedKeystonesList
 ---@return boolean isLeaver
+---@return number? logPercentage
 local function getApplicantInfoForKeys(applicantID, numMember)
     local name, class, localizedClass, level, itemLevel, honorLevel, tank, healer, damage, assignedRole, relationship, dungeonScore, pvpItemLevel, factionGroup, raceID, specID, isLeaver = C_LFGList.GetApplicantMemberInfo(applicantID, numMember)
     itemLevel = itemLevel or 0
     local shortLanguage  = ""
+    local realm = nil
     if name then
-        local realm = name:match("-(.+)") or GetNormalizedRealmName() or GFIO.PLAYER_NORMALIZED_REALM
+        realm = name:match("-(.+)") or GetNormalizedRealmName() or GFIO.PLAYER_NORMALIZED_REALM
         assert(realm, "No realm found for player: "..name)    
         local language = GFIO.REALMS[realm]
         assert(language, "No language found for realm: "..realm)
         shortLanguage = language and GFIO.LANGUAGES[language] or ""
     end
+    local mainScore, score, isMainRole, timedkeys = nil, dungeonScore, true, nil
     if RaiderIO and RaiderIO.GetProfile(name,factionGroup) then
         local profile = RaiderIO.GetProfile(name,factionGroup)
-        local mainScore, score, isMainRole = getScoreForRioProfile(profile,assignedRole)
+        mainScore, score, isMainRole = getScoreForRioProfile(profile,assignedRole)
+        timedkeys = getTimedKeys(profile)
         if dungeonScore and score and dungeonScore>score then
             score = dungeonScore
         end
-        return mainScore, score or 0, itemLevel, specID, name, shortLanguage, tank, healer, damage, isMainRole, raceID, getTimedKeys(profile), isLeaver
-    else
-        return nil, dungeonScore or 0, itemLevel, specID, name, shortLanguage, tank, healer, damage, true, raceID, nil, isLeaver
     end
+    local percentage = nil
+    if ArchonTooltip and ArchonTooltip.GetProfile then
+        local nameNoRealm = name:find("-") and name:match("(.+)-") or name
+        percentage = getLogPercentage(nameNoRealm, realm)
+    end
+    return mainScore, score or 0, itemLevel, specID, name, shortLanguage, tank, healer, damage, isMainRole, raceID, timedkeys, isLeaver, percentage
+
 end
 ---comment
 ---@param applicantID any
@@ -695,28 +778,36 @@ end
 ---@return boolean tank
 ---@return boolean healer
 ---@return boolean damage
+---@return number? logPercentage
 local function getApplicantInfoForRaid(applicantID, numMember, entryData)
     local name, class, localizedClass, level, itemLevel, honorLevel, tank, healer, damage, assignedRole, relationship, dungeonScore, pvpItemLevel, factionGroup, raceID, specID = C_LFGList.GetApplicantMemberInfo(applicantID, numMember)
     itemLevel = itemLevel or 0
     local shortLanguage  = ""
+    local realm = nil
     if name then
-        local realm = name:match("-(.+)") or GetNormalizedRealmName() or GFIO.PLAYER_NORMALIZED_REALM
+        realm = name:match("-(.+)") or GetNormalizedRealmName() or GFIO.PLAYER_NORMALIZED_REALM
         assert(realm, "No realm found for player: "..name)
         local language = realm and GFIO.REALMS[realm]
         assert(language, "No language found for realm: "..realm)
         shortLanguage = language and GFIO.LANGUAGES[language] or ""
     end
+    local maxBosses, charData, mainData = nil, nil, nil
     for _,activityID in pairs (entryData.activityIDs) do
        
         if GFIO.RAIDS[activityID] and RaiderIO and RaiderIO.GetProfile(name,factionGroup) then
             local profile = RaiderIO.GetProfile(name,factionGroup)
             local raidZone = GFIO.RAIDS[activityID]
-            local maxBosses, charData, mainData = getProgressForRioProfile(profile, raidZone.id , raidZone.difficulty)
-            return maxBosses, charData, mainData, itemLevel, specID, name, shortLanguage, tank, healer, damage
+            maxBosses, charData, mainData = getProgressForRioProfile(profile, raidZone.id , raidZone.difficulty)
+            break
         end
     end
+    local percentage = nil
+    if ArchonTooltip and ArchonTooltip.GetProfile then
+        local nameNoRealm = name:find("-") and name:match("(.+)-") or name
+        percentage = getLogPercentage(nameNoRealm, realm)
+    end
 
-    return nil, nil, nil, itemLevel, specID, name, shortLanguage, tank, healer, damage
+    return maxBosses, charData, mainData, itemLevel, specID, name, shortLanguage, tank, healer, damage, percentage
 end
 
 ---comment helper to get the score for an application
@@ -727,6 +818,7 @@ end
 ---@return boolean CanFit this is an application we cant check any multi asignments cause that calculation will get hardcore expensive with recursive calls etc
 ---@return boolean everyoneIsMain if everyone is on his main role or if someone is on alt role
 ---@return boolean hasLeaver if any member has left the group
+---@return number? logPercentage the average log percentage of the group if available
 local function getScoreForApplication(applicationID)
     -- we are calculating the average score and ilvl of a group to sort by
     local applicantInfo = C_LFGList.GetApplicantInfo(applicationID)
@@ -740,14 +832,18 @@ local function getScoreForApplication(applicationID)
     local groupExceedsMembers = applicantInfo.numMembers > (dpsSpots + tankSpots + healerSpots)
     local everyoneIsMain = true
     local hasLeaver = false
+    local averageLogPercentage = 0
     for i= 0,applicantInfo.numMembers do 
-        local applicantMainScore, applicantScore, applicantIlvl, specID, name,_, tank, healer, damage, isMainRole, _, _, isLeaver = getApplicantInfoForKeys(applicationID,i)
+        local applicantMainScore, applicantScore, applicantIlvl, specID, name,_, tank, healer, damage, isMainRole, _, _, isLeaver, logPercentage = getApplicantInfoForKeys(applicationID,i)
         if tank and not healer and not damage then
             tankSpots = tankSpots - 1
         elseif not tank and healer and not damage then
             healerSpots = healerSpots - 1
         elseif not tank and not healer and damage then
             dpsSpots = dpsSpots - 1
+        end
+        if logPercentage then
+            averageLogPercentage = averageLogPercentage + logPercentage
         end
         if isLeaver then
             hasLeaver = true
@@ -767,20 +863,21 @@ local function getScoreForApplication(applicationID)
     end 
     score = score/applicantInfo.numMembers
     ilvl = ilvl/applicantInfo.numMembers
+    local logPercentage = averageLogPercentage/applicantInfo.numMembers
     if groupExceedsMembers then
-        return score, ilvl, specIDs, false, everyoneIsMain, hasLeaver
+        return score, ilvl, specIDs, false, everyoneIsMain, hasLeaver, logPercentage
     elseif tankSpots < 0 or healerSpots < 0 or dpsSpots < 0 then
-        return score, ilvl, specIDs, false, everyoneIsMain, hasLeaver
+        return score, ilvl, specIDs, false, everyoneIsMain, hasLeaver, logPercentage
     end
-    return score, ilvl, specIDs, true, everyoneIsMain, hasLeaver
+    return score, ilvl, specIDs, true, everyoneIsMain, hasLeaver, logPercentage
 end
 ---comment compares two different applicants to sort them by score
 ---@param a number
 ---@param b number
 ---@return boolean
 local function compareApplicantsDungeons(a,b)
-    local scoreA,ilvlA,specIDsA,CanFitA, everyoneIsMainA, hasLeaverA = getScoreForApplication(a)
-    local scoreB,ilvlB,specIDsB,CanFitB, everyoneIsMainB, hasLeaverB = getScoreForApplication(b)
+    local scoreA,ilvlA,specIDsA,CanFitA, everyoneIsMainA, hasLeaverA, logPercentageA = getScoreForApplication(a)
+    local scoreB,ilvlB,specIDsB,CanFitB, everyoneIsMainB, hasLeaverB, logPercentageB = getScoreForApplication(b)
     if CanFitA and not CanFitB then
         return true
     elseif CanFitB and not CanFitA then
@@ -803,6 +900,9 @@ local function compareApplicantsDungeons(a,b)
         end
     end
     if scoreA == scoreB then
+        if logPercentageA ~= logPercentageB then
+            return GFIO.sortFunc(logPercentageA or 0, logPercentageB or 0)
+        end
         if ilvlA == ilvlB then
             return GFIO.sortFunc(a,b)
         end
@@ -817,6 +917,7 @@ end
 ---@return number ItemLevel
 ---@return boolean SpecIdsActive
 ---@return boolean CanFit this is an application we cant check any multi asignments cause that calculation will get hardcore expensive with recursive calls etc
+---@return number? logPercentage the average log percentage of the group if available
 local function getProgressForApplication(applicationID)
     -- we are calculating the average score and ilvl of a group to sort by
     local applicantInfo = C_LFGList.GetApplicantInfo(applicationID)
@@ -840,10 +941,14 @@ local function getProgressForApplication(applicationID)
     local healerSpots = 1-group.HEALER
     local groupExceedsMembers = applicantInfo.numMembers > (dpsSpots + tankSpots + healerSpots)
     local maxAvailableBosses
+    local averageLogPercentage = 0
     for i= 0,applicantInfo.numMembers do 
-        local maxBosses,charData, mainData, itemLevel, specID, name, shortLanguage, tank, healer, damage = getApplicantInfoForRaid(applicationID,i,entryData)
+        local maxBosses,charData, mainData, itemLevel, specID, name, shortLanguage, tank, healer, damage, logPercentage = getApplicantInfoForRaid(applicationID,i,entryData)
         if not maxAvailableBosses then
             maxAvailableBosses = maxBosses
+        end
+        if logPercentage then
+            averageLogPercentage = averageLogPercentage + logPercentage
         end
         if tank and not healer and not damage then
             tankSpots = tankSpots - 1
@@ -870,13 +975,14 @@ local function getProgressForApplication(applicationID)
         end
     end 
     ilvl = ilvl/applicantInfo.numMembers
+    local logPercentage = averageLogPercentage/applicantInfo.numMembers
     if not maxAvailableBosses then
         if groupExceedsMembers then
-            return 0, 0, ilvl, specIDs, false
+            return 0, 0, ilvl, specIDs, false, logPercentage
         elseif tankSpots < 0 or healerSpots < 0 or dpsSpots < 0 then
-            return 0, 0, ilvl, specIDs, false
+            return 0, 0, ilvl, specIDs, false, logPercentage
         else
-            return 0, 0, ilvl, specIDs, true
+            return 0, 0, ilvl, specIDs, true, logPercentage
         end
     end
     -- this looks like magic but what we actually do is we just add all the killed bosses multiplied by their difficulty. 
@@ -887,19 +993,19 @@ local function getProgressForApplication(applicationID)
     local avgDifficulty = floor(killedBosses/applicantInfo.numMembers/maxAvailableBosses)
 
     if groupExceedsMembers then
-        return avgKilledBosses, avgDifficulty, ilvl, specIDs, false
+        return avgKilledBosses, avgDifficulty, ilvl, specIDs, false, logPercentage
     elseif tankSpots < 0 or healerSpots < 0 or dpsSpots < 0 then
-        return avgKilledBosses, avgDifficulty, ilvl, specIDs, false
+        return avgKilledBosses, avgDifficulty, ilvl, specIDs, false, logPercentage
     end
-    return avgKilledBosses, avgDifficulty, ilvl, specIDs, true
+    return avgKilledBosses, avgDifficulty, ilvl, specIDs, true, logPercentage
 end
 ---comment compares two different applicants to sort them by raid progress
 ---@param a number
 ---@param b number
 ---@return boolean
 local function compareApplicantsRaid(a,b)
-    local avgKilledBossesA, avgDifficultyA, ilvlA, specIDsA, CanFitA  = getProgressForApplication(a)
-    local avgKilledBossesB, avgDifficultyB, ilvlB, specIDsB, CanFitB  = getProgressForApplication(b)
+    local avgKilledBossesA, avgDifficultyA, ilvlA, specIDsA, CanFitA, logPercentageA = getProgressForApplication(a)
+    local avgKilledBossesB, avgDifficultyB, ilvlB, specIDsB, CanFitB, logPercentageB = getProgressForApplication(b)
     if CanFitA ~= CanFitB then
         return not CanFitB
     end
@@ -912,6 +1018,9 @@ local function compareApplicantsRaid(a,b)
         return GFIO.sortFunc(tonumber(avgDifficultyA), tonumber(avgDifficultyB))
     end
     if avgKilledBossesA == avgKilledBossesB then
+        if logPercentageA ~= logPercentageB then
+            return GFIO.sortFunc(tonumber(logPercentageA or 0), tonumber(logPercentageB or 0))
+        end
         if ilvlA == ilvlB then
             return GFIO.sortFunc(tonumber(a), tonumber(b))
         end
@@ -974,7 +1083,7 @@ end
 ---@param memberIdx integer
 local function updateApplicationForDungeons(member, appID, memberIdx)
     local applicantInfo = C_LFGList.GetApplicantInfo(appID)
-    local mainScore, score, itemLevel, specID, name, shortLanguage,_,_,_,isMainRole, raceID, keystoneList = getApplicantInfoForKeys(appID,memberIdx)
+    local mainScore, score, itemLevel, specID, name, shortLanguage,_,_,_,isMainRole, raceID, keystoneList, isLeaver, logPercentage = getApplicantInfoForKeys(appID,memberIdx)
     if CustomNames then
         local customName = CustomNames.Get(name)
         if name ~= customName then
@@ -991,6 +1100,10 @@ local function updateApplicationForDungeons(member, appID, memberIdx)
         return
     end
     local additionalInfo = ""
+
+    if logPercentage then
+        additionalInfo = "("..colorArchonScore(logPercentage).. ") "
+    end
 
     if GFIO.db.profile.showLanguage and shortLanguage and shortLanguage~="" then
         additionalInfo = shortLanguage
@@ -1079,7 +1192,7 @@ end
 local function updateApplicationForRaids(member, appID, memberIdx) 
     local applicantInfo = C_LFGList.GetApplicantInfo(appID)
     local entryData = C_LFGList.GetActiveEntryInfo()
-    local maxBosses,charData,mainData, itemLevel, specID, name, shortLanguage, _, _, _ = getApplicantInfoForRaid(appID, memberIdx, entryData)
+    local maxBosses,charData,mainData, itemLevel, specID, name, shortLanguage, _, _, _, logPercentage = getApplicantInfoForRaid(appID, memberIdx, entryData)
     if CustomNames then
         local customName = CustomNames.Get(name)
         if name ~= customName then
@@ -1091,6 +1204,10 @@ local function updateApplicationForRaids(member, appID, memberIdx)
         return
     end
     local additionalInfo = ""
+
+    if logPercentage then
+        additionalInfo = "("..colorArchonScore(logPercentage).. ") "
+    end
 
     if GFIO.db.profile.showLanguage and shortLanguage and shortLanguage~="" then
         additionalInfo = shortLanguage.. " "
@@ -1156,6 +1273,8 @@ local function updateApplicationListEntry(member, appID, memberIdx)
             updateApplicationForDungeons(member, appID, memberIdx)
         elseif activityInfoTable.categoryID == GROUP_FINDER_CATEGORY_ID_RAIDS then
             updateApplicationForRaids(member, appID, memberIdx)
+        elseif GFIO.db.profile.debugMode then
+            print("Category is neither raid not dungeon" .. activityInfoTable.categoryID)
         end
     end
 end
