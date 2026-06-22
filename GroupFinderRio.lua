@@ -784,27 +784,25 @@ local function getApplicantInfoForRaid(applicantID, numMember, entryData)
     itemLevel = itemLevel or 0
     local shortLanguage  = ""
     local realm = nil
+    local maxBosses, charData, mainData, percentage = nil, nil, nil, nil
     if name then
         realm = name:match("-(.+)") or GetNormalizedRealmName() or GFIO.PLAYER_NORMALIZED_REALM
         assert(realm, "No realm found for player: "..name)
         local language = realm and GFIO.REALMS[realm]
         assert(language, "No language found for realm: "..realm)
         shortLanguage = language and GFIO.LANGUAGES[language] or ""
-    end
-    local maxBosses, charData, mainData = nil, nil, nil
-    for _,activityID in pairs (entryData.activityIDs) do
-       
-        if GFIO.RAIDS[activityID] and RaiderIO and RaiderIO.GetProfile(name,factionGroup) then
-            local profile = RaiderIO.GetProfile(name,factionGroup)
-            local raidZone = GFIO.RAIDS[activityID]
-            maxBosses, charData, mainData = getProgressForRioProfile(profile, raidZone.id , raidZone.difficulty)
-            break
+        for _,activityID in pairs (entryData.activityIDs) do     
+            if GFIO.RAIDS[activityID] and RaiderIO and RaiderIO.GetProfile(name,factionGroup) then
+                local profile = RaiderIO.GetProfile(name,factionGroup)
+                local raidZone = GFIO.RAIDS[activityID]
+                maxBosses, charData, mainData = getProgressForRioProfile(profile, raidZone.id , raidZone.difficulty)
+                break
+            end
         end
-    end
-    local percentage = nil
-    if ArchonTooltip and ArchonTooltip.GetProfile then
-        local nameNoRealm = name:find("-") and name:match("(.+)-") or name
-        percentage = getLogPercentage(nameNoRealm, realm)
+        if ArchonTooltip and ArchonTooltip.GetProfile and name then
+            local nameNoRealm = name:find("-") and name:match("(.+)-") or name
+            percentage = getLogPercentage(nameNoRealm, realm)
+        end
     end
 
     return maxBosses, charData, mainData, itemLevel, specID, name, shortLanguage, tank, healer, damage, percentage
