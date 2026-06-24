@@ -739,27 +739,25 @@ local function getApplicantInfoForKeys(applicantID, numMember)
     local name, class, localizedClass, level, itemLevel, honorLevel, tank, healer, damage, assignedRole, relationship, dungeonScore, pvpItemLevel, factionGroup, raceID, specID, isLeaver = C_LFGList.GetApplicantMemberInfo(applicantID, numMember)
     itemLevel = itemLevel or 0
     local shortLanguage  = ""
-    local realm = nil
+    local realm, mainScore, score, isMainRole, timedkeys, percentage = nil, nil, dungeonScore, true, nil, nil
     if name then
         realm = name:match("-(.+)") or GetNormalizedRealmName() or GFIO.PLAYER_NORMALIZED_REALM
         assert(realm, "No realm found for player: "..name)    
         local language = GFIO.REALMS[realm]
         assert(language, "No language found for realm: "..realm)
         shortLanguage = language and GFIO.LANGUAGES[language] or ""
-    end
-    local mainScore, score, isMainRole, timedkeys = nil, dungeonScore, true, nil
-    if RaiderIO and RaiderIO.GetProfile(name,factionGroup) then
-        local profile = RaiderIO.GetProfile(name,factionGroup)
-        mainScore, score, isMainRole = getScoreForRioProfile(profile,assignedRole)
-        timedkeys = getTimedKeys(profile)
-        if dungeonScore and score and dungeonScore>score then
-            score = dungeonScore
+        if RaiderIO and RaiderIO.GetProfile(name,factionGroup) then
+            local profile = RaiderIO.GetProfile(name,factionGroup)
+            mainScore, score, isMainRole = getScoreForRioProfile(profile,assignedRole)
+            timedkeys = getTimedKeys(profile)
+            if dungeonScore and score and dungeonScore>score then
+                score = dungeonScore
+            end
         end
-    end
-    local percentage = nil
-    if ArchonTooltip and ArchonTooltip.GetProfile then
-        local nameNoRealm = name:find("-") and name:match("(.+)-") or name
-        percentage = getLogPercentage(nameNoRealm, realm)
+        if ArchonTooltip and ArchonTooltip.GetProfile then
+            local nameNoRealm = name:find("-") and name:match("(.+)-") or name
+            percentage = getLogPercentage(nameNoRealm, realm)
+        end
     end
     return mainScore, score or 0, itemLevel, specID, name, shortLanguage, tank, healer, damage, isMainRole, raceID, timedkeys, isLeaver, percentage
 
