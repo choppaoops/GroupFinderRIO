@@ -685,6 +685,36 @@ local REGION_REALMS_KR = {
 	["스톰레이지"] = "korean",
 }
 
+local REGION_REALMS_TW = {
+	["世界之樹"]   = "taiwanese",
+	["亞雷戈斯"]   = "taiwanese",
+	["克羅之刃"]   = "taiwanese",
+	["冰霜之刺"]   = "taiwanese",
+	["冰風崗哨"]   = "taiwanese",
+	["地獄吼"]     = "taiwanese",
+	["夜空之歌"]   = "taiwanese",
+	["天空之牆"]   = "taiwanese",
+	["寒冰皇冠"]   = "taiwanese",
+	["尖石"]       = "taiwanese",
+	["屠魔山谷"]   = "taiwanese",
+	["巨龍之喉"]   = "taiwanese",
+	["憤怒使者"]   = "taiwanese",
+	["日落沼澤"]   = "taiwanese",
+	["暗影之月"]   = "taiwanese",
+	["水晶之刺"]   = "taiwanese",
+	["狂熱之刃"]   = "taiwanese",
+	["眾星之子"]   = "taiwanese",
+	["米奈希爾"]   = "taiwanese",
+	["老馬布蘭契"] = "taiwanese",
+	["聖光之願"]   = "taiwanese",
+	["血之谷"]     = "taiwanese",
+	["語風"]       = "taiwanese",
+	["銀翼要塞"]   = "taiwanese",
+	["阿薩斯"]     = "taiwanese",
+	["雲蛟衛"]     = "taiwanese",
+	["雷鱗"]       = "taiwanese",
+}
+
 GFIO.LANGUAGES = {
     ["british"] = "ENG",
     ["french"] = "FR",
@@ -698,6 +728,7 @@ GFIO.LANGUAGES = {
     ["brazilian"] = "BR",
     ["oceanic"] = "OCE",
 	["korean"] = "KR",
+	["taiwanese"] = "TW",
 	["beta"] = "BETA",
 }
 setmetatable(GFIO.LANGUAGES, {
@@ -711,7 +742,12 @@ if GetCurrentRegion() == 3 then
 elseif GetCurrentRegion() == 1 then
     GFIO.REALMS = REGION_REALMS_US
 elseif GetCurrentRegion() == 2 then
-    GFIO.REALMS = REGION_REALMS_KR
+    -- Region 2 同時包含韓服(koKR)與台服(zhTW)，以 locale 區分
+    if GetLocale() == "zhTW" then
+        GFIO.REALMS = REGION_REALMS_TW
+    else
+        GFIO.REALMS = REGION_REALMS_KR
+    end
 elseif GetCurrentRegion() == 90 then --beta
     GFIO.REALMS = {
 		["Xal'atath'sEndgame"] = "beta",

@@ -171,7 +171,7 @@ GFIO.DUNGEONS = {
 	[182] = {
 		id = 6988, -- Skyreach
 		difficulty = 4, -- Mythic plus
-		shortName = "SR (M+)"
+		shortName = "SR | 擎天峰"
 	},
 	
 	[485] = {
@@ -182,7 +182,7 @@ GFIO.DUNGEONS = {
 	[486] = {
 		id = 8910, -- Seat of the Triumvirate
 		difficulty = 4, -- Mythic plus
-		shortName = "SEAT (M+)"
+		shortName = "SEAT | 三傑"
 	},
 	[534] = {
 		id = 9354, -- Siege Of Boralus
@@ -308,7 +308,7 @@ GFIO.DUNGEONS = {
 	[1160] = {
 		id = 14032, -- Academy
 		difficulty = 4, -- Mythic plus
-		shortName = "AA (M+)"
+		shortName = "AA | 學院"
 	},
 	[1161] = {
 		id = 13991, -- Brackenhide
@@ -624,7 +624,7 @@ GFIO.DUNGEONS = {
 	[1770] = {
 		id = 4813, -- Pit of Saron
 		difficulty = 4, -- Mythic plus
-		shortName = "POS (M+)"
+		shortName = "POS | 薩倫"
 	},
 	[1762] = {
 		id = 16395, -- Maisara Caverns
@@ -636,10 +636,20 @@ GFIO.DUNGEONS = {
 		difficulty = 3, -- Mythic 
 		shortName = "MC (M)"
 	},
+	[1764] = {
+		id = 16395, -- Maisara Caverns
+		difficulty = 4, -- Mythic plus
+		shortName = "MC | 梅薩拉"
+	},
 	[1541] = {
 		id = 15808, -- Windrunner Spire
 		difficulty = 3, -- Mythic 
 		shortName = "WS (M)"
+	},
+	[1542] = {
+		id = 15808, -- Windrunner Spire
+		difficulty = 4, -- Mythic plus
+		shortName = "WS | 風行"
 	},
 	[1758] = {
 		id = 15829, -- Magisters' Terrace
@@ -651,10 +661,20 @@ GFIO.DUNGEONS = {
 		difficulty = 3, -- Mythic 
 		shortName = "MT (M)"
 	},
+	[1760] = {
+		id = 15829, -- Magisters' Terrace
+		difficulty = 4, -- Mythic plus
+		shortName = "MT | 博學"
+	},
 	[1767] = {
 		id = 16573, -- Nexus-Point Xenas
 		difficulty = 3, -- Mythic 
 		shortName = "NPX (M)"
+	},
+	[1768] = {
+		id = 16573, -- Nexus-Point Xenas
+		difficulty = 4, -- Mythic plus
+		shortName = "NPX | 奧核"
 	},
 	--TODO FIX THESE ↑
 }
