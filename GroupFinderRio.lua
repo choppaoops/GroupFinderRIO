@@ -445,7 +445,7 @@ local GROUP_FINDER_CATEGORY_ID_RAIDS = 3
 ---comment hooked to the updateLfgListEntry function to add the score to the group finder list
 ---@param entry table
 local function updateLfgListEntry(entry, ...)
-    if issecretvalue(entry) or not GFIO.db.profile.addScoreToGroup and not GFIO.db.profile.showLanguage then return end
+    if InCombatLockdown() or issecretvalue(entry) or not GFIO.db.profile.addScoreToGroup and not GFIO.db.profile.showLanguage then return end
     
     local searchResultID = entry.GetData().resultID
     local searchResult = C_LFGList.GetSearchResultInfo(searchResultID)
@@ -662,7 +662,7 @@ end
 ---comment hooked to the sortSearchResults function to calls compareSearchEntries to sort the search results
 ---@param entry any
 local function sortSearchResults(entry)
-    if issecretvalue(entry) or not PVEFrame:IsShown() or not LFGListFrame.SearchPanel:IsShown()or not GFIO.db.profile.sortGroupsByScore then
+    if InCombatLockdown() or issecretvalue(entry) or not PVEFrame:IsShown() or not LFGListFrame.SearchPanel:IsShown()or not GFIO.db.profile.sortGroupsByScore then
         return
     end
     if not entry.categoryID then -- we are in PGF sorting
@@ -1027,7 +1027,7 @@ end
 ---comment hooked to the sortApplicants function to calls compareApplicants to sort the applicants
 ---@param applicants table
 local function sortApplications(applicants)
-    if issecretvalue(applicants) or (not LFGListFrame.ApplicationViewer:IsShown()) or not GFIO.db.profile.sortApplicants then -- need to add checking for in dungeon queue
+    if InCombatLockdown() or issecretvalue(applicants) or (not LFGListFrame.ApplicationViewer:IsShown()) or not GFIO.db.profile.sortApplicants then -- need to add checking for in dungeon queue
         return
     end
     local entryData = C_LFGList.GetActiveEntryInfo()
@@ -1258,7 +1258,7 @@ end
 ---@param appID number
 ---@param memberIdx number
 local function updateApplicationListEntry(member, appID, memberIdx)
-    if issecretvalue(appID) or issecretvalue(memberIdx) or issecretvalue(memberidx) then
+    if InCombatLockdown() or issecretvalue(appID) or issecretvalue(memberIdx) or issecretvalue(memberidx) then
         return
     end
     local entryData = C_LFGList.GetActiveEntryInfo()
